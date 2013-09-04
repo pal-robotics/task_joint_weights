@@ -54,9 +54,8 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
     ,CONSTRUCT_SIGNAL_IN(velocity,ml::Vector)
     ,CONSTRUCT_SIGNAL_IN(dt,double)
     ,CONSTRUCT_SIGNAL_IN(controlGain,double)
-    ,CONSTRUCT_SIGNAL_IN(selec,Flags)
     ,CONSTRUCT_SIGNAL_IN(weights,ml::Matrix)
-    ,CONSTRUCT_SIGNAL_OUT(activeSize,int,velocitySIN<<selecSIN)
+    ,CONSTRUCT_SIGNAL_OUT(activeSize,int,velocitySIN)
 {
 
     //dynamicgraph::sot::DebugTrace::openFile("/tmp/weightsTask.txt");
@@ -70,8 +69,7 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
     taskSOUT.addDependency( dtSIN );
     taskSOUT.addDependency( velocitySIN );
     controlGainSIN = 1.0;
-    selecSIN = true;
-    signalRegistration( dtSIN << selecSIN << weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN );
+    signalRegistration( dtSIN << weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN );
 
     // Commands
     std::string docstring;
@@ -91,6 +89,7 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
 /* ---------------------------------------------------------------------- */
 
 void TaskJointWeights::setWeights(const ml::Vector& weightsIn){
+
     ml::Matrix mat;
     mat.setDiagonal(weightsIn);
     jacobianSOUT.clearDependencies();
@@ -99,12 +98,11 @@ void TaskJointWeights::setWeights(const ml::Vector& weightsIn){
 
 int& TaskJointWeights::activeSizeSOUT_function(int& res, int time)
 {
-    const Flags & selec = selecSIN(time);
     const int size = velocitySIN(time).size();
     res=0;
     for( int i=0;i<size;++i )
     {
-        if(selec(i)) res++;
+        res++;
     }
     return res;
 }
@@ -112,8 +110,6 @@ int& TaskJointWeights::activeSizeSOUT_function(int& res, int time)
 dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBound& res,int time )
 {
     const ml::Vector & velocity = velocitySIN(time);
-    //const ml::Vector & velocity = velocitySIN(time);
-    const Flags & selec = selecSIN(time);
     const double K = 1.0/(dtSIN(time)*controlGainSIN(time));
     const int size = velocity.size(), activeSize=activeSizeSOUT(time);
     sotDEBUG(35) << "velocity = " << velocity << std::endl;
@@ -121,7 +117,6 @@ dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBo
     res.resize(activeSize); int idx=0;
     for( int i=0;i<size;++i )
     {
-        if( selec(i) )
             res[idx++] = - K * velocity(i);
     }
 
@@ -132,19 +127,19 @@ dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBo
 
 ml::Matrix& TaskJointWeights::computeJacobian( ml::Matrix& J,int time )
 {
-    const Flags & selec = selecSIN(time);
     const ml::Matrix & weights = weightsSIN(time);
-    const int size = velocitySIN(time).size(), activeSize=activeSizeSOUT(time);
+    const int size = velocitySIN(time).size(), activeSize = activeSizeSOUT(time);
     J.resize(activeSize,size);	J.setZero();
 
     int idx=0;
     for( int i=0;i<size;++i )
-        if( selec(i) ) {
+    {
+        if(i<6)
+            J(idx,i) = 0.0;
+        else
             J(idx,i) = std::sqrt(weights(idx,i));
-            idx++;
-        }
-
-    std::cout<<"computeJacobian J "<<J<<std::endl;
+        idx++;
+    }
 
     return J;
 }

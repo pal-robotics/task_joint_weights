@@ -53,10 +53,7 @@ public:  /* --- SIGNALS --- */
     DECLARE_SIGNAL_IN(velocity,ml::Vector);
     DECLARE_SIGNAL_IN(dt,double);
     DECLARE_SIGNAL_IN(controlGain,double);
-    DECLARE_SIGNAL_IN(selec,Flags);
     DECLARE_SIGNAL_IN(weights,ml::Matrix);
-
-    //DECLARE_SIGNAL_OUT(normalizedinput,ml::Vector);
     DECLARE_SIGNAL_OUT(activeSize,int);
 
 public:  /* --- COMPUTATION --- */
