@@ -28,47 +28,45 @@
 #include <sot/core/flags.hh>
 
 namespace dynamicgraph {
-  namespace sot {
-    namespace dyninv {
+namespace sot {
 
-      /* --------------------------------------------------------------------- */
-      /* --- CLASS ----------------------------------------------------------- */
-      /* --------------------------------------------------------------------- */
+/* --------------------------------------------------------------------- */
+/* --- CLASS ----------------------------------------------------------- */
+/* --------------------------------------------------------------------- */
 
-      class TaskJointWeights
-	:public TaskAbstract
-    ,public EntityHelper<TaskJointWeights>
-	{
-	public: /* --- CONSTRUCTOR ---- */
+class TaskJointWeights
+        :public TaskAbstract
+        ,public EntityHelper<TaskJointWeights>
+{
 
-      TaskJointWeights( const std::string& name );
+public: /* --- CONSTRUCTOR ---- */
 
-	public: /* --- ENTITY INHERITANCE --- */
+    TaskJointWeights( const std::string& name );
 
-	  DYNAMIC_GRAPH_ENTITY_DECL();
-	  virtual void display( std::ostream& os ) const;
+public: /* --- ENTITY INHERITANCE --- */
 
-	public:  /* --- SIGNALS --- */
+    DYNAMIC_GRAPH_ENTITY_DECL();
+    virtual void display( std::ostream& os ) const;
 
-	  DECLARE_SIGNAL_IN(position,ml::Vector);
-    //DECLARE_SIGNAL_IN(velocity,ml::Vector);
-	  DECLARE_SIGNAL_IN(dt,double);
-	  DECLARE_SIGNAL_IN(controlGain,double);
-	  DECLARE_SIGNAL_IN(selec,Flags);
+public:  /* --- SIGNALS --- */
+
+    DECLARE_SIGNAL_IN(velocity,ml::Vector);
+    DECLARE_SIGNAL_IN(dt,double);
+    DECLARE_SIGNAL_IN(controlGain,double);
+    DECLARE_SIGNAL_IN(selec,Flags);
     DECLARE_SIGNAL_IN(weights,ml::Matrix);
 
-      //DECLARE_SIGNAL_OUT(normalizedPosition,ml::Vector);
-	  DECLARE_SIGNAL_OUT(activeSize,int);
+    //DECLARE_SIGNAL_OUT(normalizedinput,ml::Vector);
+    DECLARE_SIGNAL_OUT(activeSize,int);
 
-	public:  /* --- COMPUTATION --- */
-	  dg::sot::VectorMultiBound&
-	    computeTask( dg::sot::VectorMultiBound& res,int time );
-	  ml::Matrix& computeJacobian( ml::Matrix& J,int time );
+public:  /* --- COMPUTATION --- */
+    dg::sot::VectorMultiBound& computeTask( dg::sot::VectorMultiBound& res,int time );
+    ml::Matrix& computeJacobian( ml::Matrix& J,int time );
+    void setWeights(const ml::Vector& weightsIn);
 
-    }; // class TaskJointWeights
+}; // class TaskJointWeights
 
-    } // namespace dyninv
-  } // namespace sot
+} // namespace sot
 } // namespace dynamicgraph
 
 
