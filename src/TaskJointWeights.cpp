@@ -137,7 +137,7 @@ ml::Matrix& TaskJointWeights::computeJacobian( ml::Matrix& J,int time )
         if(i<6)
             J(idx,i) = 0.0;
         else
-            J(idx,i) = std::sqrt(weights(idx,i));
+            J(idx,i) = weights(idx,i); //TODO: sqrt + abs
         idx++;
     }
 
