@@ -1,19 +1,7 @@
-# Copyright 2010, Florent Lamiraux, CNRS
 #
-# This file is part of sot-core.
-# sot-core is free software: you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public License
-# as published by the Free Software Foundation, either version 3 of
-# the License, or (at your option) any later version.
+#  Copyright (c) 2013, PAL Robotics, S.L. Author: Gennaro Raiola
+#  Copyright 2010 CNRS
 #
-# sot-core is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Lesser Public License for more details.  You should have
-# received a copy of the GNU Lesser General Public License along with
-# dynamic-graph-tutorial. If not, see <http://www.gnu.org/licenses/>.
-
-# Libraries DEFINITIONS and INCLUDES
 
 INCLUDE(../cmake/python.cmake)
 
@@ -44,4 +32,6 @@ SET(NEW_ENTITY_CLASS
   TaskJointWeights
   )
 
-DYNAMIC_GRAPH_PYTHON_MODULE("task_joint_weights" ${LIBRARY_NAME} wrap)
+PYTHON_INSTALL_ON_SITE("dynamic_graph/sot/core" "meta_task_joint_weights.py")
+
+DYNAMIC_GRAPH_PYTHON_MODULE("/sot/core/task_joint_weights" ${LIBRARY_NAME} wrap)
