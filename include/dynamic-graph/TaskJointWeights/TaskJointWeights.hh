@@ -39,6 +39,11 @@ class TaskJointWeights
         ,public EntityHelper<TaskJointWeights>
 {
 
+protected:
+    ml::Matrix last_weights_;
+    int sample_interval_;
+    int counter_;
+
 public: /* --- CONSTRUCTOR ---- */
 
     TaskJointWeights( const std::string& name );
@@ -51,7 +56,6 @@ public: /* --- ENTITY INHERITANCE --- */
 public:  /* --- SIGNALS --- */
 
     DECLARE_SIGNAL_IN(velocity,ml::Vector);
-    DECLARE_SIGNAL_IN(dt,double);
     DECLARE_SIGNAL_IN(controlGain,double);
     DECLARE_SIGNAL_IN(weights,ml::Matrix);
     DECLARE_SIGNAL_OUT(activeSize,int);
@@ -60,6 +64,7 @@ public:  /* --- COMPUTATION --- */
     dg::sot::VectorMultiBound& computeTask( dg::sot::VectorMultiBound& res,int time );
     ml::Matrix& computeJacobian( ml::Matrix& J,int time );
     void setWeights(const ml::Vector& weightsIn);
+    void setSampleInterval(const int& sample_inteval);
 
 }; // class TaskJointWeights
 

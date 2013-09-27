@@ -51,8 +51,9 @@ DYNAMICGRAPH_FACTORY_ENTITY_PLUGIN(TaskJointWeights,"TaskJointWeights");
 
 TaskJointWeights::TaskJointWeights( const std::string & name )
     : TaskAbstract(name)
+    ,sample_interval_(0)
+    ,counter_(-1)
     ,CONSTRUCT_SIGNAL_IN(velocity,ml::Vector)
-    ,CONSTRUCT_SIGNAL_IN(dt,double)
     ,CONSTRUCT_SIGNAL_IN(controlGain,double)
     ,CONSTRUCT_SIGNAL_IN(weights,ml::Matrix)
     ,CONSTRUCT_SIGNAL_OUT(activeSize,int,velocitySIN)
@@ -66,10 +67,9 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
     jacobianSOUT.addDependency( weightsSIN );
 
     taskSOUT.clearDependencies();
-    taskSOUT.addDependency( dtSIN );
     taskSOUT.addDependency( velocitySIN );
     controlGainSIN = 1.0;
-    signalRegistration( dtSIN << weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN );
+    signalRegistration( weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN );
 
     // Commands
     std::string docstring;
@@ -80,6 +80,13 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
             " Set the weights matrix using an input vector."
             "\n";
     addCommand(std::string("setWeights"),new command::Setter<TaskJointWeights, ml::Vector>(*this, &TaskJointWeights::setWeights, docstring));
+
+    // setSampleInterval
+    docstring =
+            "\n"
+            " Set the sample interval for the weights computation."
+            "\n";
+    addCommand(std::string("setSampleInterval"),new command::Setter<TaskJointWeights, int>(*this, &TaskJointWeights::setSampleInterval, docstring));
 
 
 }
@@ -96,6 +103,11 @@ void TaskJointWeights::setWeights(const ml::Vector& weightsIn){
     jacobianSOUT.setConstant(mat);
 }
 
+void TaskJointWeights::setSampleInterval(const int& sample_inteval){
+
+    sample_interval_ = sample_inteval;
+}
+
 int& TaskJointWeights::activeSizeSOUT_function(int& res, int time)
 {
     const int size = velocitySIN(time).size();
@@ -110,7 +122,7 @@ int& TaskJointWeights::activeSizeSOUT_function(int& res, int time)
 dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBound& res,int time )
 {
     const ml::Vector & velocity = velocitySIN(time);
-    const double K = 1.0/(dtSIN(time)*controlGainSIN(time));
+    const double K = 1.0/(controlGainSIN(time)); // Take a part of the previous velocity
     const int size = velocity.size(), activeSize=activeSizeSOUT(time);
     sotDEBUG(35) << "velocity = " << velocity << std::endl;
 
@@ -127,18 +139,25 @@ dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBo
 
 ml::Matrix& TaskJointWeights::computeJacobian( ml::Matrix& J,int time )
 {
-    const ml::Matrix & weights = weightsSIN(time);
-    const int size = velocitySIN(time).size(), activeSize = activeSizeSOUT(time);
-    J.resize(activeSize,size);	J.setZero();
 
-    int idx=0;
-    for( int i=0;i<size;++i )
+    if(counter_ == sample_interval_ || counter_ == -1){
+        last_weights_ = weightsSIN(time); // Compute the weights
+        counter_ = 0;
+    }
+    else{
+        counter_++; // Use the last computed weights
+    }
+
+    const int activeSize = activeSizeSOUT(time);
+    J.resize(activeSize,activeSize);
+    J.setZero();
+
+    for( int i=0;i<activeSize;++i )
     {
-        if(i<6)
-            J(idx,i) = 0.0;
-        else
-            J(idx,i) = weights(idx,i); //TODO: sqrt + abs
-        idx++;
+        //if(i<6)
+        //    J(idx,i) = 0.0;
+        //else
+            J(i,i) = std::sqrt(last_weights_(i,i)); //TODO: sqrt + abs
     }
 
     return J;
