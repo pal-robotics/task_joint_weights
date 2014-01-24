@@ -53,10 +53,15 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
     : TaskAbstract(name)
     ,sample_interval_(0)
     ,counter_(-1)
+    ,CONSTRUCT_SIGNAL_IN(selec,Flags)
+    ,CONSTRUCT_SIGNAL_IN(dt,double)
+    ,CONSTRUCT_SIGNAL_IN(positionDes,ml::Vector)
+    ,CONSTRUCT_SIGNAL_IN(position,ml::Vector)
     ,CONSTRUCT_SIGNAL_IN(velocity,ml::Vector)
     ,CONSTRUCT_SIGNAL_IN(controlGain,double)
     ,CONSTRUCT_SIGNAL_IN(weights,ml::Matrix)
-    ,CONSTRUCT_SIGNAL_OUT(activeSize,int,velocitySIN)
+    ,CONSTRUCT_SIGNAL_OUT(activeSize,int,positionDesSIN)
+
 {
 
     //dynamicgraph::sot::DebugTrace::openFile("/tmp/weightsTask.txt");
@@ -65,11 +70,21 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
     jacobianSOUT.setFunction( boost::bind(&TaskJointWeights::computeJacobian,this,_1,_2) );
 
     jacobianSOUT.addDependency( weightsSIN );
+    jacobianSOUT.addDependency( activeSizeSOUT );
 
     taskSOUT.clearDependencies();
     taskSOUT.addDependency( velocitySIN );
+    taskSOUT.addDependency( dtSIN );
+    taskSOUT.addDependency( controlGainSIN );
+    taskSOUT.addDependency( activeSizeSOUT );
+    taskSOUT.addDependency( positionSIN );
+    taskSOUT.addDependency( positionDesSIN );
+
     controlGainSIN = 1.0;
-    signalRegistration( weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN );
+    dtSIN = 0.01;
+    selecSIN = true;
+
+    signalRegistration( weightsSIN << activeSizeSOUT << controlGainSIN << velocitySIN << positionSIN << positionDesSIN << dtSIN << selecSIN);
 
     // Commands
     std::string docstring;
@@ -81,13 +96,40 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
             "\n";
     addCommand(std::string("setWeights"),new command::Setter<TaskJointWeights, ml::Vector>(*this, &TaskJointWeights::setWeights, docstring));
 
+    // setPositionDes
+    docstring =
+            "\n"
+            " Set the desired position."
+            "\n";
+    addCommand(std::string("setPositionDes"),new command::Setter<TaskJointWeights, ml::Vector>(*this, &TaskJointWeights::setPositionDes, docstring));
+
+    // setPosition
+    docstring =
+            "\n"
+            " Set the position."
+            "\n";
+    addCommand(std::string("setPosition"),new command::Setter<TaskJointWeights, ml::Vector>(*this, &TaskJointWeights::setPosition, docstring));
+
+    // setVelocity
+    docstring =
+            "\n"
+            " Set the velocity."
+            "\n";
+    addCommand(std::string("setVelocity"),new command::Setter<TaskJointWeights, ml::Vector>(*this, &TaskJointWeights::setVelocity, docstring));
+
+    // setSize
+    docstring =
+            "\n"
+            " Set the input size."
+            "\n";
+    addCommand(std::string("setSize"),new command::Setter<TaskJointWeights, unsigned int>(*this, &TaskJointWeights::setSize, docstring));
+
     // setSampleInterval
     docstring =
             "\n"
             " Set the sample interval for the weights computation."
             "\n";
     addCommand(std::string("setSampleInterval"),new command::Setter<TaskJointWeights, int>(*this, &TaskJointWeights::setSampleInterval, docstring));
-
 
 }
 
@@ -97,10 +139,48 @@ TaskJointWeights::TaskJointWeights( const std::string & name )
 
 void TaskJointWeights::setWeights(const ml::Vector& weightsIn){
 
+    const Flags & selec = selecSIN(selecSIN.getTime());
+    const int activeSize = activeSizeSOUT(activeSizeSOUT.getTime());
+
+    //std::cout<<"selec: "<<selec<<std::endl;
+    //std::cout<<"activeSize: "<<activeSize<<std::endl;
+
     ml::Matrix mat;
-    mat.setDiagonal(weightsIn);
+    mat.resize(activeSize,size_);
+    mat.setZero();
+
+    // Filter the diagonal vector accordingly to selec
+    int idx = 0;
+    for(unsigned int i=0; i<size_; i++ )
+        if( selec(i) ){
+            mat(idx,i) = weightsIn(i);
+            idx++;
+        }
     jacobianSOUT.clearDependencies();
     jacobianSOUT.setConstant(mat);
+
+    //std::cout<<"Constant J: "<<mat<<std::endl;
+
+}
+
+void TaskJointWeights::setPositionDes(const ml::Vector& positionDes){
+
+    positionDesSIN.setConstant(positionDes);
+}
+
+void TaskJointWeights::setPosition(const ml::Vector& position){
+
+    positionSIN.setConstant(position);
+}
+
+void TaskJointWeights::setVelocity(const ml::Vector& velocity){
+
+    velocitySIN.setConstant(velocity);
+}
+
+void TaskJointWeights::setSize(const unsigned int& size){
+
+    size_ = size;
 }
 
 void TaskJointWeights::setSampleInterval(const int& sample_inteval){
@@ -110,27 +190,58 @@ void TaskJointWeights::setSampleInterval(const int& sample_inteval){
 
 int& TaskJointWeights::activeSizeSOUT_function(int& res, int time)
 {
-    const int size = velocitySIN(time).size();
-    res=0;
-    for( int i=0;i<size;++i )
+    const Flags & selec = selecSIN(time);
+    res = 0;
+    for(unsigned int i=0;i<size_;++i )
     {
-        res++;
+        if(selec(i)) res++;
     }
     return res;
 }
 
 dg::sot::VectorMultiBound& TaskJointWeights::computeTask( dg::sot::VectorMultiBound& res,int time )
 {
-    const ml::Vector & velocity = velocitySIN(time);
-    const double K = 1.0/(controlGainSIN(time)); // Take a part of the previous velocity
-    const int size = velocity.size(), activeSize=activeSizeSOUT(time);
-    sotDEBUG(35) << "velocity = " << velocity << std::endl;
 
-    res.resize(activeSize); int idx=0;
-    for( int i=0;i<size;++i )
+    const Flags & selec = selecSIN(time);
+    const ml::Vector & v = velocitySIN(time);
+    const ml::Vector & p = positionSIN(time);
+    const ml::Vector & pd = positionDesSIN(time);
+
+    //assert(v.size() == p.size() && v.size() == pd.size() && p.size() == pd.size());
+
+    const double dt = dtSIN(time);
+    const double K = controlGainSIN(time)/dt;
+    const int activeSize = activeSizeSOUT(time);
+
+    err_.resize(size_);
+
+    // Compute the position error
+    for(unsigned int i=0;i<size_;++i )
+        err_(i) = pd(i) - p(i);
+
+    sotDEBUG(35) << "velocity = " << v << std::endl;
+    sotDEBUG(35) << "positionDes = " << pd << std::endl;
+    sotDEBUG(35) << "position = " << p << std::endl;
+    sotDEBUG(35) << "err = " << err_ << std::endl;
+
+    //std::cout<<"pos: "<<p<<std::endl;
+    //std::cout<<"posDes: "<<pd<<std::endl;
+    //std::cout<<"vel: "<<v<<std::endl;
+    //std::cout<<"err: "<<err_<<std::endl;
+
+    res.resize(activeSize);
+    int idx = 0;
+    for(unsigned int i=0;i<size_;++i )
     {
-            res[idx++] = - K * velocity(i);
+        if( selec(i) ){
+            res[idx] = K * (err_(i) - dt * v(i));
+            idx++;
+        }
     }
+
+    //std::cout<<"res: "<<res<<std::endl;
+
+    //getchar();
 
     sotDEBUG(15) << "taskW = "<< res << std::endl;
 
@@ -148,17 +259,20 @@ ml::Matrix& TaskJointWeights::computeJacobian( ml::Matrix& J,int time )
         counter_++; // Use the last computed weights
     }
 
+    const Flags & selec = selecSIN(time);
     const int activeSize = activeSizeSOUT(time);
-    J.resize(activeSize,activeSize);
+
+    J.resize(activeSize,size_);
     J.setZero();
 
-    for( int i=0;i<activeSize;++i )
-    {
-        //if(i<6)
-        //    J(idx,i) = 0.0;
-        //else
-            J(i,i) = std::sqrt(last_weights_(i,i)); //TODO: sqrt + abs
-    }
+    int idx = 0;
+    for(unsigned int i=0;i<size_;++i )
+        if( selec(i) ){
+            J(idx,i) = std::sqrt(last_weights_(i,i));
+            idx++;
+        }
+
+    //std::cout<<"J: "<<J<<std::endl;
 
     return J;
 }

@@ -43,6 +43,8 @@ protected:
     ml::Matrix last_weights_;
     int sample_interval_;
     int counter_;
+    unsigned int size_;
+    ml::Vector err_;
 
 public: /* --- CONSTRUCTOR ---- */
 
@@ -55,6 +57,10 @@ public: /* --- ENTITY INHERITANCE --- */
 
 public:  /* --- SIGNALS --- */
 
+    DECLARE_SIGNAL_IN(selec,Flags);
+    DECLARE_SIGNAL_IN(dt,double);
+    DECLARE_SIGNAL_IN(positionDes,ml::Vector);
+    DECLARE_SIGNAL_IN(position,ml::Vector);
     DECLARE_SIGNAL_IN(velocity,ml::Vector);
     DECLARE_SIGNAL_IN(controlGain,double);
     DECLARE_SIGNAL_IN(weights,ml::Matrix);
@@ -63,8 +69,12 @@ public:  /* --- SIGNALS --- */
 public:  /* --- COMPUTATION --- */
     dg::sot::VectorMultiBound& computeTask( dg::sot::VectorMultiBound& res,int time );
     ml::Matrix& computeJacobian( ml::Matrix& J,int time );
+    void setPositionDes(const ml::Vector& positionDes);
+    void setPosition(const ml::Vector& position);
     void setWeights(const ml::Vector& weightsIn);
     void setSampleInterval(const int& sample_inteval);
+    void setVelocity(const ml::Vector& velocity);
+    void setSize(const unsigned int& size);
 
 }; // class TaskJointWeights
 
