@@ -1,5 +1,5 @@
 bin
-build
+*build
 lib
 *.user
 *~
@@ -7,4 +7,4 @@ lib
 .pydevproject
 .project
 .settings
-_*
+
